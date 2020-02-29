@@ -1,11 +1,18 @@
-const   express     = require("express"),
-        app         = express(),
-        bodyParser  = require("body-parser"),
-        mongoose    = require("mongoose"),
-        Campground  = require("./models/campground"),
-        seedDB      = require("./seeds"),
-        Comment     = require("./models/comment")
+const   express                     = require("express"),
+        app                         = express(),
+        bodyParser                  = require("body-parser"),
+        mongoose                    = require("mongoose"),
+        Campground                  = require("./models/campground"),
+        seedDB                      = require("./seeds"),
+        Comment                     = require("./models/comment"),
+        passport                    = require('passport'),
+        LocalStrategy               = require('passport-local'),
+        User                        = require('./models/user')
 
+//requing routes
+const   commentRoutes               = require('./routes/comments'),
+        campgroundRoutes            = require('./routes/campgrounds'),
+        indexRoutes                  = require('./routes/index')
 
 
 mongoose.connect("mongodb://localhost:27017/yelp_camp", {useNewUrlParser: true, useUnifiedTopology: true})
@@ -16,102 +23,30 @@ app.use(express.static(__dirname + "/public"))
 
 seedDB();
 
-app.get("/", (req, res) => {
-    res.render("landing")
+//PASSPORT CONFIG
+app.use(require('express-session')({
+    secret: 'Once again Rusty wins cutest dog!',
+    resave: false,
+    saveUninitialized: false
+}))
+
+app.use(passport.initialize())
+app.use(passport.session())
+passport.use(new LocalStrategy(User.authenticate()))
+passport.serializeUser(User.serializeUser())
+passport.deserializeUser(User.deserializeUser())
+
+//Every route will use currentUser and our header file will use it to hide/show links
+app.use(function(req, res, next) {
+    res.locals.currentUser = req.user;
+    next();
 })
 
 
-app.get("/campgrounds", (req, res) => {
-    //Get all campgrounds from db
-    Campground.find({}, function(err, campgrounds) {
-        if(err){
-            console.log(err)
-        } else {
-            res.render("campgrounds/index", {campgrounds: campgrounds})
-        }
-    })
-   
-    // res.render("campgrounds", {campgrounds: campgrounds})
-})
-
-app.get("/campgrounds/new", (req, res) => {
-    res.render("campgrounds/new")
-})
-
-app.post("/campgrounds", (req, res) => {
-    // get data form form and add data to campgrounds array
-    let name = req.body.name
-    let image = req.body.image
-    let desc = req.body.description
-    let newCampground = {name: name, image: image, description: desc}
-    //Create a new campground and save it to DB
-    Campground.create(newCampground, function(err, newItem) {
-        if(err) {
-            console.log(err)
-        } else {
-            // redirect back to campgrounds array
-            res.redirect("/campgrounds")
-        }
-    })
-    
-   
-})
-
-//SHOW - show more info about one campground
-app.get("/campgrounds/:id", function(req, res){
-    //find the campground with provided ID
-    Campground.findById(req.params.id).populate("comments").exec(function(err, foundCampground){
-        if(err){
-            console.log(err);
-        } else {
-            //render show template with that campground
-            res.render("campgrounds/show", {campground: foundCampground});
-        }
-    });
-})  
-
-//====================================================
-//COMMENTS ROUTES
-//====================================================
-
-//NEW ROUTE
-app.get("/campgrounds/:id/comments/new", (req, res) => {
-    //find campground by id
-    Campground.findById(req.params.id, function(err, campground) {
-        if(err) {
-            console.log(err)
-        } else {
-            res.render("comments/new", {campground: campground})
-        }
-    })
-    
-})
-
-//COMMENTS POST ROUTE
-app.post("/campgrounds/:id/comments", (req, res) => {
-    //lookup capm using ID
-    Campground.findById(req.params.id, function(err, campground) {
-        if(err) {
-            console.log(err)
-            red.redirect("/campgrounds")
-        } else {
-            Comment.create(req.body.comment, function(err, comment) {
-                if(err) {
-                    console.log(err)
-                } else {
-                    campground.comments.push(comment)
-                    campground.save()
-                    res.redirect("/campgrounds/" + campground._id)
-                }
-            })
-        }
-    })
-    //create new comment
-    //connect new comment to camp
-    //redirect camp show page
-})
-
-
+app.use(indexRoutes);
+app.use('/campgrounds/:id/comments',commentRoutes);
+app.use('/campgrounds',campgroundRoutes);
+ 
 app.listen(3000, () => {
     console.log("Server is listening on port 3000")
 })
