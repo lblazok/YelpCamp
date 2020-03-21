@@ -8,20 +8,22 @@ const   express                     = require("express"),
         passport                    = require('passport'),
         LocalStrategy               = require('passport-local'),
         User                        = require('./models/user'),
-        methodOverride              = require('method-override')
+        methodOverride              = require('method-override'),
+        flash                       = require('connect-flash')
 
 //requing routes
 const   commentRoutes               = require('./routes/comments'),
         campgroundRoutes            = require('./routes/campgrounds'),
-        indexRoutes                  = require('./routes/index')
+        indexRoutes                 = require('./routes/index')
 
 
-mongoose.connect("mongodb://localhost:27017/yelp_camp", {useNewUrlParser: true, useUnifiedTopology: true})
+mongoose.connect("mongodb://localhost:27017/yelp_camp", {useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false})
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs")
 app.use(express.static(__dirname + "/public"))
 app.use(methodOverride('_method'))
+app.use(flash())
 
 // seedDB(); //Seed DB with data
 
@@ -39,8 +41,12 @@ passport.serializeUser(User.serializeUser())
 passport.deserializeUser(User.deserializeUser())
 
 //Every route will use currentUser and our header file will use it to hide/show links
+//Do same for flash message error/success
 app.use(function(req, res, next) {
     res.locals.currentUser = req.user;
+    res.locals.error = req.flash('error')
+    res.locals.success = req.flash('success')
+
     next();
 })
 
